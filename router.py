@@ -77,6 +77,25 @@ async def predict_inmobiliario(data: InmobiliarioRequest):
         raise HTTPException(status_code=500, detail=f"Error en predicción: {str(e)}")
 
 
+@router.post("/inmobiliario/explain")
+async def explain_inmobiliario(data: InmobiliarioRequest):
+    """
+    Devuelve SHAP values para explicar una predicción individual (waterfall chart).
+    """
+    if not (ARTIFACTS / "gbm_model.joblib").exists():
+        raise HTTPException(status_code=503, detail="Modelo no entrenado.")
+
+    from model import get_predictor
+
+    loop = asyncio.get_event_loop()
+    try:
+        predictor = await loop.run_in_executor(_executor, get_predictor)
+        result = await loop.run_in_executor(_executor, predictor.explain, data.model_dump())
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error SHAP: {str(e)}")
+
+
 @router.get("/inmobiliario/stats")
 async def inmobiliario_stats():
     """Métricas del modelo (R², MAE, n_samples) para mostrar en la demo."""

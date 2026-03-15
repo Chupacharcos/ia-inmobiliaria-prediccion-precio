@@ -5,6 +5,7 @@ Se carga de forma lazy en la primera request (patrón thread-safe).
 
 import json
 import threading
+import pickle
 import numpy as np
 import joblib
 import torch
@@ -34,6 +35,18 @@ class InmobiliarioPredictor:
         self._y_std = ckpt["y_std"]
 
         self.features = FEATURES
+        self._shap_explainer = None
+        self._shap_lock = threading.Lock()
+
+        # Cargar background data para SHAP
+        test_path = ARTIFACTS / "test_data.pkl"
+        if test_path.exists():
+            with open(test_path, "rb") as f:
+                test_data = pickle.load(f)
+            X_bg = test_data["X_test"][:100]
+            self._shap_bg = X_bg.astype(np.float32)
+        else:
+            self._shap_bg = None
 
     # ── Feature engineering (replica train.py) ───────────────────────────────
 
@@ -145,6 +158,56 @@ class InmobiliarioPredictor:
                 "n_samples": self.metadata["n_samples_total"],
                 "dataset":   self.metadata["dataset"],
             },
+        }
+
+    def explain(self, data: dict) -> dict:
+        """Computa SHAP values para una predicción individual."""
+        import shap
+        X = self._build_vector(data).reshape(1, -1)
+
+        with self._shap_lock:
+            if self._shap_explainer is None:
+                if self._shap_bg is not None:
+                    self._shap_explainer = shap.TreeExplainer(
+                        self.gbm,
+                        data=self._shap_bg,
+                        feature_perturbation="interventional"
+                    )
+                else:
+                    self._shap_explainer = shap.TreeExplainer(self.gbm)
+
+        shap_values = self._shap_explainer(X)
+        sv = shap_values.values[0]
+        base = float(shap_values.base_values[0])
+        predicted = float(self.gbm.predict(X)[0])
+
+        # Feature labels legibles
+        label_map = {
+            'sqft_living': 'Superficie', 'bedrooms': 'Habitaciones', 'bathrooms': 'Baños',
+            'floors': 'Plantas', 'condition': 'Estado', 'grade': 'Calidad',
+            'yr_built': 'Año construc.', 'yr_renovated_flag': 'Reformado',
+            'lat': 'Latitud', 'long': 'Longitud', 'sqft_lot': 'Parcela',
+            'view': 'Vistas', 'waterfront': 'Frente agua',
+            'sqft_living15': 'Vecinos m²', 'zipcode_encoded': 'Zona barrio',
+            'age': 'Antigüedad', 'renovated': 'Reformado', 'rooms_total': 'Total habitac.',
+            'sqft_per_room': 'm² por hab.', 'sqft_above': 'Sup. rasante',
+        }
+
+        contributions = [
+            {
+                "feature": f,
+                "label": label_map.get(f, f),
+                "value": float(X[0][i]),
+                "shap": float(sv[i])
+            }
+            for i, f in enumerate(self.features)
+        ]
+        contributions.sort(key=lambda x: abs(x["shap"]), reverse=True)
+
+        return {
+            "base_value": base,
+            "predicted_gbm": predicted,
+            "contributions": contributions[:12]
         }
 
     def get_stats(self) -> dict:
