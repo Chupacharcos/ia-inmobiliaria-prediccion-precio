@@ -119,14 +119,14 @@ class InmobiliarioPredictor:
     def predict(self, data: dict) -> dict:
         X = self._build_vector(data).reshape(1, -1)
 
-        # GBM
-        price_gbm = float(self.gbm.predict(X)[0])
+        # GBM (trained on log-price, back-transform with expm1)
+        price_gbm = float(np.expm1(self.gbm.predict(X)[0]))
 
-        # MLP
+        # MLP (trained on log-price, back-transform)
         X_scaled = self.scaler.transform(X)
         with torch.no_grad():
             pred_n = self.mlp(torch.FloatTensor(X_scaled)).item()
-        price_mlp = pred_n * self._y_std + self._y_mean
+        price_mlp = float(np.expm1(pred_n * self._y_std + self._y_mean))
 
         # Ensemble 60/40
         price_ensemble = price_gbm * 0.60 + price_mlp * 0.40
@@ -178,8 +178,8 @@ class InmobiliarioPredictor:
 
         shap_values = self._shap_explainer(X)
         sv = shap_values.values[0]
-        base = float(shap_values.base_values[0])
-        predicted = float(self.gbm.predict(X)[0])
+        base = float(np.expm1(shap_values.base_values[0]))
+        predicted = float(np.expm1(self.gbm.predict(X)[0]))
 
         # Feature labels legibles
         label_map = {

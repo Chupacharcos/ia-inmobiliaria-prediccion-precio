@@ -134,11 +134,12 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
 def train_gbm(X_train: np.ndarray, y_train: np.ndarray) -> HistGradientBoostingRegressor:
     print("  Entrenando HistGradientBoostingRegressor...")
     gbm = HistGradientBoostingRegressor(
-        max_iter=400,
-        max_depth=7,
-        learning_rate=0.05,
-        min_samples_leaf=15,
-        l2_regularization=0.1,
+        max_iter=600,
+        max_depth=8,
+        learning_rate=0.04,
+        min_samples_leaf=10,
+        max_leaf_nodes=63,
+        l2_regularization=0.05,
         random_state=42,
         verbose=0,
     )
@@ -214,12 +215,21 @@ def main():
 
     X = df[FEATURES].values.astype(np.float32)
     y = df[TARGET].values.astype(np.float32)
+    # Log-transform price: reduces skew and improves R² significantly
+    y_log = np.log1p(y)
 
-    X_train, X_test, y_train, y_test = train_test_split(
+    X_train, X_test, y_train_log, y_test_log = train_test_split(
+        X, y_log, test_size=0.15, random_state=42
+    )
+    # Also keep real-scale test labels
+    _, _, y_train_real, y_test = train_test_split(
         X, y, test_size=0.15, random_state=42
     )
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_train, y_train, test_size=0.12, random_state=42
+    X_train, X_val, y_train_log, y_val_log = train_test_split(
+        X_train, y_train_log, test_size=0.12, random_state=42
+    )
+    _, _, y_train_real_full, y_val_real = train_test_split(
+        X_train, np.expm1(y_train_log), test_size=0.12, random_state=42
     )
     print(f"  Train: {len(X_train):,}  Val: {len(X_val):,}  Test: {len(X_test):,}")
 
@@ -227,20 +237,21 @@ def main():
     scaler = StandardScaler()
     scaler.fit(X_train)
 
-    # 3. GBM
-    gbm = train_gbm(X_train, y_train)
-    gbm_pred = gbm.predict(X_test)
+    # 3. GBM (trained on log-price, evaluated on real scale)
+    gbm = train_gbm(X_train, y_train_log)
+    gbm_pred = np.expm1(gbm.predict(X_test))
     gbm_mae = mean_absolute_error(y_test, gbm_pred)
     gbm_r2 = r2_score(y_test, gbm_pred)
     print(f"  GBM — MAE: ${gbm_mae:,.0f}  R²: {gbm_r2:.4f}")
 
-    # 4. MLP
-    mlp = train_mlp(X_train, y_train, X_val, y_val, scaler)
+    # 4. MLP (trained on log-price too)
+    mlp = train_mlp(X_train, y_train_log, X_val, y_val_log, scaler)
     mlp.eval()
     X_test_s = scaler.transform(X_test)
     with torch.no_grad():
         mlp_pred_n = mlp(torch.FloatTensor(X_test_s)).numpy()
-        mlp_pred = mlp_pred_n * mlp.y_std + mlp.y_mean
+        mlp_pred_log = mlp_pred_n * mlp.y_std + mlp.y_mean
+        mlp_pred = np.expm1(mlp_pred_log)
     mlp_mae = mean_absolute_error(y_test, mlp_pred)
     mlp_r2 = r2_score(y_test, mlp_pred)
     print(f"  MLP — MAE: ${mlp_mae:,.0f}  R²: {mlp_r2:.4f}")
@@ -248,7 +259,7 @@ def main():
     # 5. Feature importances del GBM
     from sklearn.inspection import permutation_importance
     print("  Calculando feature importances (permutation)...")
-    perm = permutation_importance(gbm, X_val, y_val, n_repeats=5, random_state=42, n_jobs=-1)
+    perm = permutation_importance(gbm, X_val, y_val_log, n_repeats=5, random_state=42, n_jobs=-1)
     importances = dict(zip(FEATURES, perm.importances_mean.tolist()))
     # Normalizar a porcentaje
     total = sum(max(v, 0) for v in importances.values())
