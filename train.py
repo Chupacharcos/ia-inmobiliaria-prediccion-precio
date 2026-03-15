@@ -296,8 +296,13 @@ def main():
     }
     (ARTIFACTS / "metadata.json").write_text(json.dumps(metadata, indent=2, ensure_ascii=False))
 
-    # Guardar muestra de test para imagen de portada
-    joblib.dump({'y_test': y_test, 'gbm_pred': gbm_pred, 'mlp_pred': mlp_pred}, ARTIFACTS / "test_data.pkl")
+    # Guardar muestra de test para SHAP background + imagen de portada
+    joblib.dump({
+        'X_test':    X_test[:200],   # background data para SHAP
+        'y_test':    y_test,
+        'gbm_pred':  gbm_pred,
+        'mlp_pred':  mlp_pred,
+    }, ARTIFACTS / "test_data.pkl")
 
     print(f"\n  Artifacts guardados en {ARTIFACTS}")
     print(f"\n  RESULTADOS FINALES:")

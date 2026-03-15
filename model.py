@@ -38,15 +38,17 @@ class InmobiliarioPredictor:
         self._shap_explainer = None
         self._shap_lock = threading.Lock()
 
-        # Cargar background data para SHAP
+        # Cargar background data para SHAP (opcional — falla silenciosa)
+        self._shap_bg = None
         test_path = ARTIFACTS / "test_data.pkl"
         if test_path.exists():
-            with open(test_path, "rb") as f:
-                test_data = pickle.load(f)
-            X_bg = test_data["X_test"][:100]
-            self._shap_bg = X_bg.astype(np.float32)
-        else:
-            self._shap_bg = None
+            try:
+                with open(test_path, "rb") as f:
+                    test_data = pickle.load(f)
+                if "X_test" in test_data:
+                    self._shap_bg = test_data["X_test"][:100].astype(np.float32)
+            except Exception:
+                pass  # archivo corrupto o versión antigua — SHAP funciona sin background
 
     # ── Feature engineering (replica train.py) ───────────────────────────────
 
