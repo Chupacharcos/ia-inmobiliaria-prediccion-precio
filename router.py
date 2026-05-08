@@ -90,7 +90,11 @@ async def explain_inmobiliario(data: InmobiliarioRequest):
     loop = asyncio.get_event_loop()
     try:
         predictor = await loop.run_in_executor(_executor, get_predictor)
-        result = await loop.run_in_executor(_executor, predictor.explain, data.model_dump())
+        payload = data.model_dump()
+        result = await loop.run_in_executor(_executor, predictor.explain, payload)
+        # Devolver el input para que el frontend pueda construir narrativas humanas con SHAP
+        if isinstance(result, dict):
+            result.setdefault("input", payload)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error SHAP: {str(e)}")
