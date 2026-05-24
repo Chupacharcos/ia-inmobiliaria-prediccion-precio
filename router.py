@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 router = APIRouter(prefix="/ml", tags=["ML"])
+from utils import router as utils_router
+router.include_router(utils_router)
 
 _executor = ThreadPoolExecutor(max_workers=2)
 
