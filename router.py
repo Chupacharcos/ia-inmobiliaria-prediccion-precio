@@ -13,6 +13,8 @@ from typing import Optional
 
 router = APIRouter(prefix="/ml", tags=["ML"])
 from utils import router as utils_router
+from validaciones import validaciones
+router.include_router(validaciones.router)
 router.include_router(utils_router)
 
 _executor = ThreadPoolExecutor(max_workers=2)
