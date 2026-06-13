@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 router = APIRouter(prefix="/ml", tags=["ML"])
+from analytics_endpoint import router as analytics_endpoint_router
+router.include_router(analytics_endpoint_router)
 from analytics import router as analytics_router
 router.include_router(analytics_router)
 from utils_inmobiliario import router as utils_inmobiliario_router
