@@ -7,3 +7,4 @@ venv/
 api.log
 *.log
 artifacts/
+data_es/

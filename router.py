@@ -134,3 +134,62 @@ async def inmobiliario_stats():
         "features":  metadata.get("features"),
         "feature_importances": metadata.get("feature_importances"),
     }
+
+
+# ── ESPAÑA (modelo idealista18, datos reales 2018) ──────────────────────────────
+
+class EspanaRequest(BaseModel):
+    city: str        = Field(default="Madrid", description="Madrid | Barcelona | Valencia")
+    area_m2: float   = Field(default=80,  ge=20,  le=800, description="Superficie construida (m²)")
+    rooms: float     = Field(default=3,   ge=0,   le=12,  description="Habitaciones")
+    bathrooms: float = Field(default=1,   ge=0,   le=8,   description="Baños")
+    year_built: float= Field(default=1980, ge=1850, le=2018, description="Año de construcción")
+    floor: float     = Field(default=2,   ge=-1,  le=40,  description="Planta")
+    # Geografía: la aporta la ZONA elegida (coords reales del dataset).
+    lat: float       = Field(default=40.42, description="Latitud (de la zona)")
+    long: float      = Field(default=-3.70, description="Longitud (de la zona)")
+    distance_to_center: float = Field(default=3.0, ge=0, le=40, description="Distancia al centro (km)")
+    has_lift: int    = Field(default=1, ge=0, le=1)
+    has_terrace: int = Field(default=0, ge=0, le=1)
+    has_parking: int = Field(default=0, ge=0, le=1)
+    has_ac: int      = Field(default=0, ge=0, le=1)
+    has_pool: int    = Field(default=0, ge=0, le=1)
+    has_garden: int  = Field(default=0, ge=0, le=1)
+    is_duplex: int   = Field(default=0, ge=0, le=1)
+    is_studio: int   = Field(default=0, ge=0, le=1)
+    is_top_floor: int= Field(default=0, ge=0, le=1)
+
+
+@router.post("/inmobiliario/predict_es")
+async def predict_inmobiliario_es(data: EspanaRequest):
+    """Predice precio en España (Madrid/Barcelona/Valencia) con el modelo
+    entrenado sobre datos REALES de idealista18 (2018)."""
+    if not (ARTIFACTS / "es_gbm_model.joblib").exists():
+        raise HTTPException(503, "Modelo España no entrenado. Ejecuta python3 train_es.py")
+    import model_es
+    loop = asyncio.get_event_loop()
+    try:
+        return await loop.run_in_executor(_executor, model_es.predict, data.model_dump())
+    except Exception as e:
+        raise HTTPException(500, f"Error en predicción ES: {e}")
+
+
+@router.get("/inmobiliario/stats_es")
+async def inmobiliario_stats_es():
+    """Métricas + zonas por ciudad del modelo España (para la demo)."""
+    if not (ARTIFACTS / "es_metadata.json").exists():
+        raise HTTPException(503, "Modelo España no entrenado.")
+    import model_es
+    m = model_es.get_metadata()
+    return {
+        "cargado": model_es.is_loaded(),
+        "dataset": m.get("dataset"),
+        "dataset_doi": m.get("dataset_doi"),
+        "cities": m.get("cities"),
+        "n_total": m.get("n_total"),
+        "metrics": m.get("metrics"),
+        "city_stats": m.get("city_stats"),
+        "city_zones": m.get("city_zones"),
+        "top_features": m.get("top_features"),
+        "synthetic": m.get("synthetic", False),
+    }
