@@ -6,6 +6,34 @@ Demo interactiva en producción: [adrianmoreno-dev.com/demo/prediccion-precio-in
 
 ---
 
+<!-- LOOP-MAP:START (generado por `php artisan project:loop readme` — no editar a mano) -->
+
+## El bucle que cierra
+
+<p align="center"><img src="https://adrianmoreno-dev.com/bucle/prediccion-precio-inmobiliario.svg" alt="Mapa del bucle de Predicción de Precio Inmobiliario" width="900"></p>
+
+**Para** quien está tasando una vivienda y duda del precio · **Por vivienda**
+
+| Etapa | Qué pasa | Quién |
+|---|---|---|
+| **1. Disparador** | Tengo una vivienda delante y no sé si el precio que piden se sostiene. | persona |
+| **2. Acción** | Mete sus características en un ensemble de gradient boosting y una red MLP entrenados con 21.563 ventas reales. | software |
+| **3. Medición** | El precio estimado y qué características lo mueven, con un error medio de unos 64.000 dólares. | software |
+| **4. Decisión** | Decido si el precio pedido está dentro de rango o me lo pienso. | persona |
+
+### Lo que no hace
+
+- No es el mercado español: el modelo está entrenado con ventas del condado de King, en Washington.
+- No tasa oficialmente: es una estimación estadística, no una tasación con validez legal.
+- El dataset son ventas de 2014 y 2015: no refleja el mercado de hoy.
+
+### Por qué está construido así
+
+- **Ensemble de árboles y red neuronal** en vez de quedarse con el mejor de los dos modelos — Los árboles capturan los saltos por tramos y la red las relaciones suaves. Mezclados al 60/40 quedan por encima de cualquiera de los dos suelto.
+- **Publicar el error en euros** en vez de publicar solo el coeficiente de determinación — Un R² alto no dice si te puedes fiar del número. Un error medio en dinero sí se entiende delante de una vivienda concreta.
+
+<!-- LOOP-MAP:END -->
+
 ## Resultados
 
 | Modelo | R² | MAE |
