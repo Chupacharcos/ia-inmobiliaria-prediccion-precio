@@ -15,6 +15,8 @@ router = APIRouter(prefix="/ml", tags=["ML"])
 from explainability import router as explain_router
 router.include_router(explain_router)
 from diagnostics_router import router as diagnostics_router
+from model_metrics_new import router as metrics_router
+router.include_router(metrics_router)
 router.include_router(diagnostics_router)
 from model_metrics import router as model_metrics_router
 router.include_router(model_metrics_router)
